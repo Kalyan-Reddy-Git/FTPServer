@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetTransfer – FTP File Transfer System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Google Font: Inter / System Font Fallback -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="navbar">
+        <div class="container nav-container">
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                        <path d="m8 17 4 4 4-4"></path>
+                        <path d="M12 12v9"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="brand-title">NetTransfer</h1>
+                    <span class="brand-subtitle">Application Layer FTP Protocol Client</span>
+                </div>
+            </div>
+            <div class="nav-status-chip" id="navStatusChip">
+                <span class="status-dot disconnected"></span>
+                <span id="navStatusText">Status: Disconnected</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container main-content">
+
+        <!-- 1. HOME / HERO SECTION -->
+        <section class="hero-section" id="home">
+            <div class="hero-card">
+                <div class="hero-tag">Computer Networks &amp; Ethical Hacking Project</div>
+                <h2 class="hero-title">NetTransfer – FTP File Transfer System</h2>
+                <p class="hero-subtitle">Simple and Secure File Transfer System</p>
+                <p class="hero-description">
+                    NetTransfer connects directly to File Transfer Protocol (FTP) servers via RFC 959 standards. 
+                    Manage remote files, navigate directory hierarchies, upload local files, and download data over 
+                    the TCP/IP Application Layer through an intuitive web interface.
+                </p>
+                <div class="hero-actions">
+                    <a href="#connection-section" class="btn btn-primary" id="btnScrollConnect">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                        Connect to Server
+                    </a>
+                    <button type="button" class="btn btn-outline" id="btnFillDemo">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+                            <path d="m9 8 6 4-6 4Z"></path>
+                        </svg>
+                        Autofill Local Host (127.0.0.1:2121)
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. FTP CONNECTION SECTION -->
+        <section class="section" id="connection-section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title-group">
+                        <div class="card-icon">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect>
+                                <rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect>
+                                <line x1="6" x2="6.01" y1="6" y2="6"></line>
+                                <line x1="6" x2="6.01" y1="18" y2="18"></line>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="card-title">FTP Connection Settings</h3>
+                            <p class="card-desc">Provide your target FTP server host, port, and credentials to establish a control session.</p>
+                        </div>
+                    </div>
+                    <div class="badge-status disconnected" id="connectionBadge">
+                        <span class="status-indicator"></span>
+                        <span id="badgeStatusText">Disconnected</span>
+                    </div>
+                </div>
+
+                <!-- Alert Message Banner -->
+                <div id="connectionAlert" class="alert d-none">
+                    <span id="alertIcon"></span>
+                    <span id="alertMessage"></span>
+                </div>
+
+                <form id="ftpConnectForm" class="connection-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="serverHost">Server IP / Hostname <span class="required">*</span></label>
+                            <input type="text" id="serverHost" name="serverHost" placeholder="e.g. 127.0.0.1 or ftp.example.com" required>
+                            <small class="field-hint">IPv4 address or domain of the FTP host</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="serverPort">Port Number <span class="required">*</span></label>
+                            <input type="number" id="serverPort" name="serverPort" value="21" min="1" max="65535" required>
+                            <small class="field-hint">Default FTP port is 21 (or 2121 for local test)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="serverUser">Username</label>
+                            <input type="text" id="serverUser" name="serverUser" placeholder="anonymous or username" value="anonymous">
+                            <small class="field-hint">Use 'anonymous' for public FTP servers</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="serverPass">Password</label>
+                            <input type="password" id="serverPass" name="serverPass" placeholder="Leave empty for anonymous">
+                            <small class="field-hint">Server user authentication password</small>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="btnConnect">
+                            <span class="spinner d-none" id="connectSpinner"></span>
+                            <svg class="btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                            </svg>
+                            Connect
+                        </button>
+                        <button type="button" class="btn btn-danger" id="btnDisconnect" disabled>
+                            <svg class="btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" x2="6" y1="6" y2="18"></line>
+                                <line x1="6" x2="18" y1="6" y2="18"></line>
+                            </svg>
+                            Disconnect
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- 3. FILE MANAGER SECTION -->
+        <section class="section" id="file-manager-section">
+            <div class="card">
+                <div class="card-header file-manager-header">
+                    <div class="card-title-group">
+                        <div class="card-icon">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="card-title">Remote File Manager</h3>
+                            <p class="card-desc">Browse, upload, and download files from the remote server working directory.</p>
+                        </div>
+                    </div>
+
+                    <!-- Toolbar actions -->
+                    <div class="fm-toolbar">
+                        <button type="button" class="btn btn-sm btn-outline" id="btnParentDir" title="Navigate to Parent Directory" disabled>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m15 18-6-6 6-6"></path>
+                            </svg>
+                            Parent Folder (..)
+                        </button>
+
+                        <button type="button" class="btn btn-sm btn-outline" id="btnRefreshFiles" title="Refresh Current Folder" disabled>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                                <path d="M3 3v5h5"></path>
+                                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+                                <path d="M16 21h5v-5"></path>
+                            </svg>
+                            Refresh
+                        </button>
+
+                        <label for="fileUploadInput" class="btn btn-sm btn-primary btn-upload-label disabled" id="btnUploadLabel">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" x2="12" y1="3" y2="15"></line>
+                            </svg>
+                            Upload File
+                            <input type="file" id="fileUploadInput" class="d-none" disabled>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Path Breadcrumb Display -->
+                <div class="path-bar">
+                    <span class="path-label">Current Path:</span>
+                    <span class="path-value" id="currentDirectoryPath">/ (Disconnected)</span>
+                </div>
+
+                <!-- Upload Progress Banner -->
+                <div id="uploadProgressBox" class="upload-progress-box d-none">
+                    <div class="progress-info">
+                        <span id="uploadFileName">Uploading file...</span>
+                        <span class="spinner spinner-sm"></span>
+                    </div>
+                </div>
+
+                <!-- Files Table -->
+                <div class="table-responsive">
+                    <table class="file-table" id="fileTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 44px;">Type</th>
+                                <th>Name</th>
+                                <th style="width: 140px;">Kind</th>
+                                <th style="width: 130px;">Size</th>
+                                <th style="width: 180px; text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fileTableBody">
+                            <tr class="empty-row">
+                                <td colspan="5" class="empty-state">
+                                    <div class="empty-content">
+                                        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#94a3b8" stroke-width="1.5">
+                                            <rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect>
+                                            <rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect>
+                                        </svg>
+                                        <p class="empty-text">No active FTP connection.</p>
+                                        <p class="empty-subtext">Connect to an FTP server above to view and manage remote files.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. ACTIVITY LOG SECTION -->
+        <section class="section" id="activity-log-section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title-group">
+                        <div class="card-icon">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" x2="8" y1="13" y2="13"></line>
+                                <line x1="16" x2="8" y1="17" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="card-title">Activity Log</h3>
+                            <p class="card-desc">Chronological record of Application Layer FTP commands, connections, and file transfers.</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline" id="btnClearLogs">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Clear Log
+                    </button>
+                </div>
+
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry log-info">
+                        <span class="log-time">[System]</span>
+                        <span class="log-badge badge-info">INFO</span>
+                        <span class="log-msg">NetTransfer client initialized. Ready to connect to FTP server.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 5. FOOTER -->
+    <footer class="footer">
+        <div class="container footer-content">
+            <div class="footer-block">
+                <p class="footer-title">Computer Networks and Ethical Hacking Laboratory Project</p>
+                <p class="footer-subtitle">Implementation of Application Layer Protocols</p>
+            </div>
+            <div class="footer-info">
+                <span>File Transfer Protocol (FTP) • RFC 959</span>
+                <span class="sep">•</span>
+                <span>Python Flask &amp; ftplib</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

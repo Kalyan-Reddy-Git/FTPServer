@@ -1,0 +1,5 @@
+Welcome to NetTransfer Demo FTP Server!
+----------------------------------------
+This FTP server is running locally to demonstrate Application Layer Protocols.
+Protocol: FTP (File Transfer Protocol - RFC 959)
+Feel free to download this file, upload new files, or navigate folders.

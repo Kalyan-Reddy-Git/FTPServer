@@ -1,0 +1,3 @@
+Experiment No: Application Layer FTP Client Implementation
+Objective: Understand control vs data connections in FTP and implement
+file retrieval and storage using socket-based ftplib.
