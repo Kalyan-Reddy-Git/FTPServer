@@ -285,14 +285,17 @@ def api_delete():
 
 
 if __name__ == '__main__':
-    # Determine debug mode from environment (defaults to False for production safety)
+    # Determine debug mode, host, and port from environment (Render sets PORT dynamically)
     is_debug = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1')
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = int(os.environ.get('PORT', 5000))
 
     print("==================================================================")
     print("  NetTransfer – FTP File Transfer System (Flask Backend)")
     print("  Course Project: Implementation of Application Layer Protocols")
     print(f"  Debug Mode : {is_debug}")
-    print("  Access Web Interface at: http://127.0.0.1:5000")
+    print(f"  Listening on: http://{host}:{port}")
     print("==================================================================")
 
-    app.run(host='127.0.0.1', port=5000, debug=is_debug)
+    app.run(host=host, port=port, debug=is_debug)
+
