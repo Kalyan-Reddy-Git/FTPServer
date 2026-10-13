@@ -59,7 +59,9 @@ STORAGE_PATH = os.environ.get('STORAGE_PATH', DEFAULT_STORAGE_PATH)
 init_db(DB_PATH)
 
 import socket
-import threading
+import subprocess
+import sys
+import time
 
 def is_port_in_use(port, host='127.0.0.1'):
     """Checks if a TCP port is currently listening on host."""
@@ -70,11 +72,11 @@ def is_port_in_use(port, host='127.0.0.1'):
     except Exception:
         return False
 
-def start_embedded_ftp_server(host=None, port=None):
+def ensure_ftp_server_running(host=None, port=None):
     """
-    Starts an embedded test FTP server on loopback if not already running.
-    This guarantees that on hosted cloud platforms like Render, Heroku, or Docker,
-    the internal test FTP server is always running inside the same container.
+    Guarantees the test FTP server is running as an independent OS process.
+    Auto-spawns on container boot and auto-heals on demand if disconnected.
+    Works seamlessly on Linux (Render), Docker, and Windows.
     """
     host = host or os.environ.get('FTP_HOST', '127.0.0.1')
     try:
@@ -83,38 +85,69 @@ def start_embedded_ftp_server(host=None, port=None):
         port = 2121
 
     if is_port_in_use(port, host):
-        print(f"[*] FTP server already listening on {host}:{port}")
-        return
+        return True
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    script_path = os.path.join(base_dir, "run_demo_ftp_server.py")
 
     try:
-        from run_demo_ftp_server import DatabaseAuthorizer, setup_demo_directory
-        from pyftpdlib.handlers import FTPHandler
-        from pyftpdlib.servers import FTPServer
+        kwargs = {
+            "cwd": base_dir,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if hasattr(os, "setsid"):
+            kwargs["start_new_session"] = True
 
-        setup_demo_directory(STORAGE_PATH)
+        proc = subprocess.Popen(
+            [sys.executable, script_path, "--host", "0.0.0.0", "--port", str(port)],
+            **kwargs
+        )
+        print(f"[*] Auto-spawned FTP server process (PID: {proc.pid}) on port {port}")
 
-        authorizer = DatabaseAuthorizer(db_path=DB_PATH, storage_root=STORAGE_PATH)
-        authorizer.add_user("student", "student123", STORAGE_PATH, perm="elradfmwM")
-        authorizer.add_user("demo", "password123", STORAGE_PATH, perm="elradfmwM")
-        authorizer.add_anonymous(STORAGE_PATH, perm="elr")
-
-        handler = FTPHandler
-        handler.authorizer = authorizer
-        handler.banner = "NetTransfer Embedded Test FTP Server Ready (RFC 959)."
-        handler.failed_login_delay = 0
-
-        server = FTPServer((host, port), handler)
-        server.max_cons = 256
-        server.max_cons_per_ip = 20
-
-        t = threading.Thread(target=lambda: server.serve_forever(handle_exit=False), daemon=True)
-        t.start()
-        print(f"[*] Embedded Test FTP Server successfully started in background on {host}:{port}")
+        # Wait up to 3 seconds for the socket to become actively available
+        for _ in range(15):
+            time.sleep(0.2)
+            if is_port_in_use(port, host):
+                print(f"[+] FTP server is actively listening on {host}:{port}")
+                return True
     except Exception as e:
-        print(f"[-] Could not start embedded FTP server: {e}")
+        print(f"[-] Subprocess spawn error: {e}")
 
-# Automatically start embedded FTP server on container startup
-start_embedded_ftp_server()
+    # Fallback to in-process thread if subprocess spawn is restricted in environment
+    if not is_port_in_use(port, host):
+        try:
+            import threading
+            from run_demo_ftp_server import DatabaseAuthorizer, setup_demo_directory
+            from pyftpdlib.handlers import FTPHandler
+            from pyftpdlib.servers import FTPServer
+
+            setup_demo_directory(STORAGE_PATH)
+            authorizer = DatabaseAuthorizer(db_path=DB_PATH, storage_root=STORAGE_PATH)
+            authorizer.add_user("student", "student123", STORAGE_PATH, perm="elradfmwM")
+            authorizer.add_user("demo", "password123", STORAGE_PATH, perm="elradfmwM")
+            authorizer.add_anonymous(STORAGE_PATH, perm="elr")
+
+            handler = FTPHandler
+            handler.authorizer = authorizer
+            handler.banner = "NetTransfer Embedded Test FTP Server Ready (RFC 959)."
+            handler.failed_login_delay = 0
+
+            server = FTPServer(("0.0.0.0", port), handler)
+            server.max_cons = 256
+            server.max_cons_per_ip = 20
+
+            t = threading.Thread(target=lambda: server.serve_forever(handle_exit=False), daemon=True)
+            t.start()
+            print(f"[*] In-process FTP Server thread started on port {port}")
+            time.sleep(0.5)
+        except Exception as e:
+            print(f"[-] Fallback thread start error: {e}")
+
+    return is_port_in_use(port, host)
+
+# Start FTP server on application initialization
+ensure_ftp_server_running()
 
 
 def login_required(f):
@@ -305,6 +338,10 @@ def api_connect():
     if not is_valid:
         return jsonify({'success': False, 'message': err_msg}), 400
 
+    # Ensure internal FTP server is active when connecting to loopback
+    if host in ['127.0.0.1', 'localhost', '0.0.0.0']:
+        ensure_ftp_server_running(port=port)
+
     client = get_current_session_client(protocol=protocol)
     result = client.connect(host=host, port=port, username=username, password=password)
 
@@ -355,6 +392,10 @@ def api_test_connect():
     is_valid, err_msg = validate_host(host)
     if not is_valid:
         return jsonify({'success': False, 'message': err_msg}), 400
+
+    # Ensure internal FTP server is active when testing loopback
+    if host in ['127.0.0.1', 'localhost', '0.0.0.0']:
+        ensure_ftp_server_running(port=port)
 
     # Instantiate a temporary client strictly for testing
     test_client = create_client_instance(protocol=protocol)
