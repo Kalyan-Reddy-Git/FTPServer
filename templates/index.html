@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NetTransfer – FTP File Transfer System</title>
+    <title>NetTransfer – Multi-Protocol File Transfer System (FTP, FTPS, SFTP)</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- Google Font: Inter / System Font Fallback -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,7 +25,7 @@
                 </div>
                 <div>
                     <h1 class="brand-title">NetTransfer</h1>
-                    <span class="brand-subtitle">Application Layer FTP Protocol Client</span>
+                    <span class="brand-subtitle">Multi-Protocol Application Layer Transfer (FTP / FTPS / SFTP)</span>
                 </div>
             </div>
             <div class="nav-status-chip" id="navStatusChip">
@@ -41,12 +41,12 @@
         <section class="hero-section" id="home">
             <div class="hero-card">
                 <div class="hero-tag">Computer Networks &amp; Ethical Hacking Project</div>
-                <h2 class="hero-title">NetTransfer – FTP File Transfer System</h2>
-                <p class="hero-subtitle">Simple and Secure File Transfer System</p>
+                <h2 class="hero-title">NetTransfer – Multi-Protocol File Transfer System</h2>
+                <p class="hero-subtitle">Simple, Dynamic, and Secure File Transfer (FTP • FTPS • SFTP)</p>
                 <p class="hero-description">
-                    NetTransfer connects directly to File Transfer Protocol (FTP) servers via RFC 959 standards. 
-                    Manage remote files, navigate directory hierarchies, upload local files, and download data over 
-                    the TCP/IP Application Layer through an intuitive web interface.
+                    NetTransfer connects directly to remote file servers using standard Application Layer protocols. 
+                    Manage remote files, navigate directory hierarchies, upload and download data, create folders, and 
+                    rename items over standard FTP, encrypted FTPS (TLS/SSL), or secure SFTP (SSH-2.0).
                 </p>
                 <div class="hero-actions">
                     <a href="#connection-section" class="btn btn-primary" id="btnScrollConnect">
@@ -66,7 +66,7 @@
             </div>
         </section>
 
-        <!-- 2. FTP CONNECTION SECTION -->
+        <!-- 2. CONNECTION SECTION -->
         <section class="section" id="connection-section">
             <div class="card">
                 <div class="card-header">
@@ -80,8 +80,8 @@
                             </svg>
                         </div>
                         <div>
-                            <h3 class="card-title">FTP Connection Settings</h3>
-                            <p class="card-desc">Provide your target FTP server host, port, and credentials to establish a control session.</p>
+                            <h3 class="card-title">Server Connection Settings</h3>
+                            <p class="card-desc">Choose protocol, enter your server host, port, and credentials to establish a session.</p>
                         </div>
                     </div>
                     <div class="badge-status disconnected" id="connectionBadge">
@@ -96,30 +96,54 @@
                     <span id="alertMessage"></span>
                 </div>
 
+                <!-- Security Advisory Banner based on selected protocol -->
+                <div id="protocolSecurityNotice" class="protocol-security-notice notice-ftp">
+                    <div class="notice-icon">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </div>
+                    <div class="notice-text">
+                        <strong>Security Note:</strong> Standard FTP sends credentials and data in cleartext (RFC 959). For secure communication, choose <strong>FTPS</strong> or <strong>SFTP</strong>.
+                    </div>
+                </div>
+
                 <form id="ftpConnectForm" class="connection-form">
                     <div class="form-grid">
                         <div class="form-group">
+                            <label for="serverProtocol">Protocol <span class="required">*</span></label>
+                            <select id="serverProtocol" name="serverProtocol">
+                                <option value="ftp" selected>FTP – File Transfer Protocol (Port 21, Unencrypted)</option>
+                                <option value="ftps">FTPS – FTP over TLS/SSL (Port 21, Encrypted)</option>
+                                <option value="sftp">SFTP – SSH File Transfer Protocol (Port 22, Encrypted)</option>
+                            </select>
+                            <small class="field-hint">Select network application protocol</small>
+                        </div>
+
+                        <div class="form-group">
                             <label for="serverHost">Server IP / Hostname <span class="required">*</span></label>
-                            <input type="text" id="serverHost" name="serverHost" placeholder="e.g. 127.0.0.1 or ftp.example.com" required>
-                            <small class="field-hint">IPv4 address or domain of the FTP host</small>
+                            <input type="text" id="serverHost" name="serverHost" placeholder="e.g. 127.0.0.1 or sftp.example.com" required>
+                            <small class="field-hint">IPv4 address or domain of the remote server</small>
                         </div>
 
                         <div class="form-group">
                             <label for="serverPort">Port Number <span class="required">*</span></label>
                             <input type="number" id="serverPort" name="serverPort" value="21" min="1" max="65535" required>
-                            <small class="field-hint">Default FTP port is 21 (or 2121 for local test)</small>
+                            <small class="field-hint" id="portHint">Default FTP port is 21 (SFTP is 22)</small>
                         </div>
 
                         <div class="form-group">
                             <label for="serverUser">Username</label>
                             <input type="text" id="serverUser" name="serverUser" placeholder="anonymous or username" value="anonymous">
-                            <small class="field-hint">Use 'anonymous' for public FTP servers</small>
+                            <small class="field-hint">Authentication username</small>
                         </div>
 
                         <div class="form-group">
                             <label for="serverPass">Password</label>
                             <input type="password" id="serverPass" name="serverPass" placeholder="Leave empty for anonymous">
-                            <small class="field-hint">Server user authentication password</small>
+                            <small class="field-hint">Authentication password (kept in-memory)</small>
                         </div>
                     </div>
 
@@ -132,6 +156,16 @@
                             </svg>
                             Connect
                         </button>
+
+                        <button type="button" class="btn btn-outline" id="btnTestConnect">
+                            <span class="spinner d-none" id="testSpinner"></span>
+                            <svg class="btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            Test Connection
+                        </button>
+
                         <button type="button" class="btn btn-danger" id="btnDisconnect" disabled>
                             <svg class="btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="18" x2="6" y1="6" y2="18"></line>
@@ -156,7 +190,7 @@
                         </div>
                         <div>
                             <h3 class="card-title">Remote File Manager</h3>
-                            <p class="card-desc">Browse, upload, and download files from the remote server working directory.</p>
+                            <p class="card-desc">Browse, manage, upload, download, and rename files on the remote server.</p>
                         </div>
                     </div>
 
@@ -179,11 +213,20 @@
                             Refresh
                         </button>
 
+                        <button type="button" class="btn btn-sm btn-outline" id="btnNewFolder" title="Create New Folder" disabled>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+                                <line x1="12" y1="11" x2="12" y2="17"></line>
+                                <line x1="9" y1="14" x2="15" y2="14"></line>
+                            </svg>
+                            New Folder
+                        </button>
+
                         <label for="fileUploadInput" class="btn btn-sm btn-primary btn-upload-label disabled" id="btnUploadLabel">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                 <polyline points="17 8 12 3 7 8"></polyline>
-                                <line x1="12" x2="12" y1="3" y2="15"></line>
+                                <line x1="12" y1="12" x2="12" y2="3"></line>
                             </svg>
                             Upload File
                             <input type="file" id="fileUploadInput" class="d-none" disabled>
@@ -197,11 +240,14 @@
                     <span class="path-value" id="currentDirectoryPath">/ (Disconnected)</span>
                 </div>
 
-                <!-- Upload Progress Banner -->
+                <!-- Upload Progress Banner with Visual Bar -->
                 <div id="uploadProgressBox" class="upload-progress-box d-none">
                     <div class="progress-info">
                         <span id="uploadFileName">Uploading file...</span>
-                        <span class="spinner spinner-sm"></span>
+                        <span id="uploadPercent">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="uploadProgressBarFill"></div>
                     </div>
                 </div>
 
@@ -214,7 +260,7 @@
                                 <th>Name</th>
                                 <th style="width: 140px;">Kind</th>
                                 <th style="width: 130px;">Size</th>
-                                <th style="width: 180px; text-align: right;">Actions</th>
+                                <th style="width: 250px; text-align: right;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="fileTableBody">
@@ -225,8 +271,8 @@
                                             <rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect>
                                             <rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect>
                                         </svg>
-                                        <p class="empty-text">No active FTP connection.</p>
-                                        <p class="empty-subtext">Connect to an FTP server above to view and manage remote files.</p>
+                                        <p class="empty-text">No active connection.</p>
+                                        <p class="empty-subtext">Connect to an FTP, FTPS, or SFTP server above to view and manage remote files.</p>
                                     </div>
                                 </td>
                             </tr>
@@ -252,7 +298,7 @@
                         </div>
                         <div>
                             <h3 class="card-title">Activity Log</h3>
-                            <p class="card-desc">Chronological record of Application Layer FTP commands, connections, and file transfers.</p>
+                            <p class="card-desc">Chronological record of Application Layer commands, transfers, and security events.</p>
                         </div>
                     </div>
                     <button type="button" class="btn btn-sm btn-outline" id="btnClearLogs">
@@ -268,13 +314,53 @@
                     <div class="log-entry log-info">
                         <span class="log-time">[System]</span>
                         <span class="log-badge badge-info">INFO</span>
-                        <span class="log-msg">NetTransfer client initialized. Ready to connect to FTP server.</span>
+                        <span class="log-msg">NetTransfer client initialized. Multi-protocol ready (FTP, FTPS, SFTP).</span>
                     </div>
                 </div>
             </div>
         </section>
 
     </main>
+
+    <!-- MODAL 1: CREATE NEW FOLDER -->
+    <div class="modal-overlay d-none" id="mkdirModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h4 class="modal-title">Create New Folder</h4>
+                <button type="button" class="btn-modal-close" id="btnCloseMkdirModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="newFolderName" class="modal-label">Folder Name:</label>
+                <input type="text" id="newFolderName" class="modal-input" placeholder="e.g. documents, project_files" required>
+                <small class="field-hint">Folder will be created in the current directory.</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline btn-sm" id="btnCancelMkdir">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnSubmitMkdir">Create Folder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: RENAME ITEM -->
+    <div class="modal-overlay d-none" id="renameModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h4 class="modal-title">Rename Item</h4>
+                <button type="button" class="btn-modal-close" id="btnCloseRenameModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="renameOldName">
+                <input type="hidden" id="renameItemType">
+                <label for="renameNewName" class="modal-label">New Name:</label>
+                <input type="text" id="renameNewName" class="modal-input" placeholder="Enter new filename or folder name" required>
+                <small class="field-hint">Renames the item on the remote server.</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline btn-sm" id="btnCancelRename">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnSubmitRename">Rename</button>
+            </div>
+        </div>
+    </div>
 
     <!-- 5. FOOTER -->
     <footer class="footer">
@@ -284,9 +370,9 @@
                 <p class="footer-subtitle">Implementation of Application Layer Protocols</p>
             </div>
             <div class="footer-info">
-                <span>File Transfer Protocol (FTP) • RFC 959</span>
+                <span>FTP (RFC 959) • FTPS (RFC 4217) • SFTP (SSH-2.0)</span>
                 <span class="sep">•</span>
-                <span>Python Flask &amp; ftplib</span>
+                <span>Python Flask &amp; Paramiko</span>
             </div>
         </div>
     </footer>
