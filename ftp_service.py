@@ -157,6 +157,8 @@ class FTPClient(BaseTransferClient):
             return {"success": False, "message": err}
 
         self.host = host.strip()
+        if self.host.lower() == "localhost":
+            self.host = "127.0.0.1"
         try:
             self.port = int(port)
             if self.port < 1 or self.port > 65535:
@@ -221,16 +223,19 @@ class FTPClient(BaseTransferClient):
             return {"success": False, "message": err}
 
         test_ftp = None
+        target_host = host.strip()
+        if target_host.lower() == "localhost":
+            target_host = "127.0.0.1"
         try:
             port_num = int(port)
             test_ftp = FTP(timeout=8)
-            test_ftp.connect(host.strip(), port_num, timeout=8)
+            test_ftp.connect(target_host, port_num, timeout=8)
             test_ftp.login(username.strip() if username else "anonymous", password if password else "")
             test_ftp.voidcmd("NOOP")
             test_ftp.quit()
             return {
                 "success": True,
-                "message": f"FTP connection test succeeded! Server reachable at {host}:{port_num} with provided credentials.",
+                "message": f"FTP connection test succeeded! Server reachable at {target_host}:{port_num} with provided credentials.",
                 "protocol": "ftp"
             }
         except error_perm as e:

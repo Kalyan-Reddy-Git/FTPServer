@@ -107,7 +107,7 @@ def start_embedded_ftp_server(host=None, port=None):
         server.max_cons = 256
         server.max_cons_per_ip = 20
 
-        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t = threading.Thread(target=lambda: server.serve_forever(handle_exit=False), daemon=True)
         t.start()
         print(f"[*] Embedded Test FTP Server successfully started in background on {host}:{port}")
     except Exception as e:
