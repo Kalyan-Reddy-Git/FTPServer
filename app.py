@@ -58,6 +58,64 @@ DB_PATH = os.environ.get('DATABASE_PATH', DEFAULT_DB_PATH)
 STORAGE_PATH = os.environ.get('STORAGE_PATH', DEFAULT_STORAGE_PATH)
 init_db(DB_PATH)
 
+import socket
+import threading
+
+def is_port_in_use(port, host='127.0.0.1'):
+    """Checks if a TCP port is currently listening on host."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            return s.connect_ex((host, port)) == 0
+    except Exception:
+        return False
+
+def start_embedded_ftp_server(host=None, port=None):
+    """
+    Starts an embedded test FTP server on loopback if not already running.
+    This guarantees that on hosted cloud platforms like Render, Heroku, or Docker,
+    the internal test FTP server is always running inside the same container.
+    """
+    host = host or os.environ.get('FTP_HOST', '127.0.0.1')
+    try:
+        port = int(port or os.environ.get('FTP_PORT', 2121))
+    except (ValueError, TypeError):
+        port = 2121
+
+    if is_port_in_use(port, host):
+        print(f"[*] FTP server already listening on {host}:{port}")
+        return
+
+    try:
+        from run_demo_ftp_server import DatabaseAuthorizer, setup_demo_directory
+        from pyftpdlib.handlers import FTPHandler
+        from pyftpdlib.servers import FTPServer
+
+        setup_demo_directory(STORAGE_PATH)
+
+        authorizer = DatabaseAuthorizer(db_path=DB_PATH, storage_root=STORAGE_PATH)
+        authorizer.add_user("student", "student123", STORAGE_PATH, perm="elradfmwM")
+        authorizer.add_user("demo", "password123", STORAGE_PATH, perm="elradfmwM")
+        authorizer.add_anonymous(STORAGE_PATH, perm="elr")
+
+        handler = FTPHandler
+        handler.authorizer = authorizer
+        handler.banner = "NetTransfer Embedded Test FTP Server Ready (RFC 959)."
+        handler.failed_login_delay = 0
+
+        server = FTPServer((host, port), handler)
+        server.max_cons = 256
+        server.max_cons_per_ip = 20
+
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        print(f"[*] Embedded Test FTP Server successfully started in background on {host}:{port}")
+    except Exception as e:
+        print(f"[-] Could not start embedded FTP server: {e}")
+
+# Automatically start embedded FTP server on container startup
+start_embedded_ftp_server()
+
 
 def login_required(f):
     """Decorator ensuring that only authenticated website clients can access private APIs."""
