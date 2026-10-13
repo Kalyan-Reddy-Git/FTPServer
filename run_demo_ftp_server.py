@@ -33,6 +33,17 @@ class DatabaseAuthorizer(DummyAuthorizer):
         self.db_path = db_path
         self.storage_root = storage_root
 
+    def add_user(self, username: str, password: str, homedir: str, perm: str = "elr", msg_login: str = "", msg_quit: str = ""):
+        """Safely registers or updates a user without raising ValueError if already present in DB."""
+        self.user_table[username] = {
+            'pwd': password,
+            'home': homedir,
+            'perm': perm,
+            'operms': {},
+            'msg_login': msg_login,
+            'msg_quit': msg_quit
+        }
+
     def has_user(self, username: str) -> bool:
         if super().has_user(username):
             return True
