@@ -1,20 +1,23 @@
 """
 app.py
-Flask web server for NetTransfer – FTP, FTPS, and SFTP File Transfer System
+Flask web server for NetTransfer – Multi-Protocol File Transfer System (FTP, FTPS, SFTP)
 Course: Computer Networks and Ethical Hacking
 Project: Implementation of Application Layer Protocols
 
-SECURITY PRACTICES:
+SECURITY & ARCHITECTURAL PRACTICES:
+- Client registration & authentication with secure password hashing (scrypt/PBKDF2)
+- Dynamic automatic FTP account provisioning with isolated client directories
+- Protected private APIs with @login_required decorator
 - Multi-protocol dispatch (FTP, FTPS, SFTP) with session isolation
 - Strict path sanitization preventing directory traversal
 - SSRF filtering on remote hosts
-- Passwords are never logged, exposed in responses, or stored on disk
-- Safe temporary download streaming with immediate cleanup
-- Production debug disabled unless explicit FLASK_DEBUG is provided
+- Passwords are strictly in-memory during authentication and NEVER stored in plaintext or logged
+- Safe temporary download streaming with immediate cleanup hook
 """
 
 import os
 import uuid
+from functools import wraps
 from flask import (
     Flask,
     render_template,
@@ -25,6 +28,16 @@ from flask import (
     after_this_request
 )
 from werkzeug.utils import secure_filename
+
+from database import (
+    init_db,
+    register_user,
+    authenticate_user,
+    get_user_by_id,
+    get_user_by_username,
+    DEFAULT_DB_PATH,
+    DEFAULT_STORAGE_PATH
+)
 from ftp_service import (
     session_manager,
     sanitize_filename,
@@ -39,6 +52,25 @@ app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 
 # Restrict maximum upload payload to 50 MB
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
+
+# Initialize SQLite user database
+DB_PATH = os.environ.get('DATABASE_PATH', DEFAULT_DB_PATH)
+STORAGE_PATH = os.environ.get('STORAGE_PATH', DEFAULT_STORAGE_PATH)
+init_db(DB_PATH)
+
+
+def login_required(f):
+    """Decorator ensuring that only authenticated website clients can access private APIs."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({
+                'success': False,
+                'message': 'Authentication required. Please log in or create an account.',
+                'requires_login': True
+            }), 401
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 def get_current_session_client(protocol=None):
@@ -57,19 +89,149 @@ def index():
     return render_template('index.html')
 
 
+# ==============================================================================
+# AUTHENTICATION & ACCOUNT PROVISIONING ENDPOINTS
+# ==============================================================================
+
+@app.route('/api/register', methods=['POST'])
+def api_register():
+    """
+    Endpoint: Client Registration & Automatic FTP Account Provisioning
+    Accepts: JSON { fullname, email, username, password, confirm_password }
+    1. Validates input complexity and uniqueness.
+    2. Hashes password using secure PBKDF2/scrypt.
+    3. Provisions isolated directory in demo_ftp_storage/users/<username>.
+    4. Links website user account with dynamic FTP server authorizer.
+    """
+    data = request.get_json() or {}
+    fullname = data.get('fullname', '')
+    email = data.get('email', '')
+    username = data.get('username', '')
+    password = data.get('password', '')
+    confirm_password = data.get('confirm_password', '')
+
+    success, message, user = register_user(
+        fullname=fullname,
+        email=email,
+        username=username,
+        password=password,
+        confirm_password=confirm_password,
+        db_path=DB_PATH,
+        storage_root=STORAGE_PATH
+    )
+
+    if not success:
+        return jsonify({'success': False, 'message': message}), 400
+
+    # Automatically initialize authenticated web session
+    session['user_id'] = user['id']
+    session['username'] = user['username']
+    session['fullname'] = user['fullname']
+    session['email'] = user['email']
+
+    return jsonify({
+        'success': True,
+        'message': message,
+        'user': user
+    }), 201
+
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    """
+    Endpoint: Client Login
+    Accepts: JSON { username, password }
+    Authenticates client using hashed password comparison and initiates web session.
+    """
+    data = request.get_json() or {}
+    identifier = data.get('username', '') or data.get('identifier', '')
+    password = data.get('password', '')
+
+    success, message, user = authenticate_user(
+        username_or_email=identifier,
+        password=password,
+        db_path=DB_PATH
+    )
+
+    if not success:
+        return jsonify({'success': False, 'message': message}), 401
+
+    session['user_id'] = user['id']
+    session['username'] = user['username']
+    session['fullname'] = user['fullname']
+    session['email'] = user['email']
+
+    return jsonify({
+        'success': True,
+        'message': message,
+        'user': user
+    })
+
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    """
+    Endpoint: Client Logout
+    Terminates active FTP client connection and destroys web session.
+    """
+    if 'user_session_id' in session:
+        try:
+            client = session_manager.get_client(session['user_session_id'])
+            if client and client.connected:
+                client.disconnect()
+        except Exception:
+            pass
+
+    session.clear()
+    return jsonify({'success': True, 'message': 'Logged out successfully.'})
+
+
+@app.route('/api/me', methods=['GET'])
+def api_me():
+    """
+    Endpoint: Current User Profile
+    Returns current authenticated state and basic client details (no password).
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'authenticated': False, 'user': None})
+
+    user = get_user_by_id(user_id, db_path=DB_PATH)
+    if not user:
+        session.clear()
+        return jsonify({'authenticated': False, 'user': None})
+
+    return jsonify({
+        'authenticated': True,
+        'user': {
+            'id': user['id'],
+            'username': user['username'],
+            'fullname': user['fullname'],
+            'email': user['email'],
+            'ftp_home_dir': user['ftp_home_dir']
+        }
+    })
+
+
+# ==============================================================================
+# APPLICATION LAYER PROTOCOL TRANSFER ENDPOINTS
+# ==============================================================================
+
 @app.route('/api/connect', methods=['POST'])
+@login_required
 def api_connect():
     """
     Endpoint: Connect to Server
     Accepts: JSON { host, port, username, password, protocol: 'ftp' | 'ftps' | 'sftp' }
     Establishes connection using specified Application Layer protocol.
+    Enforces that logged-in clients use their own provisioned credentials when connecting locally.
     NOTE: The password is used in-memory for authentication and NEVER returned in the response.
     """
     data = request.get_json() or {}
     host = str(data.get('host', '')).strip()
     protocol = str(data.get('protocol', 'ftp')).lower().strip()
     port = data.get('port')
-    username = str(data.get('username', 'anonymous')).strip()
+    username = str(data.get('username', '')).strip() or session.get('username', 'anonymous')
     password = str(data.get('password', ''))
 
     if protocol not in ['ftp', 'ftps', 'sftp']:
@@ -110,6 +272,7 @@ def api_connect():
 
 
 @app.route('/api/test-connect', methods=['POST'])
+@login_required
 def api_test_connect():
     """
     Endpoint: Test Connection
@@ -120,7 +283,7 @@ def api_test_connect():
     host = str(data.get('host', '')).strip()
     protocol = str(data.get('protocol', 'ftp')).lower().strip()
     port = data.get('port')
-    username = str(data.get('username', 'anonymous')).strip()
+    username = str(data.get('username', '')).strip() or session.get('username', 'anonymous')
     password = str(data.get('password', ''))
 
     if protocol not in ['ftp', 'ftps', 'sftp']:
@@ -144,6 +307,7 @@ def api_test_connect():
 
 
 @app.route('/api/disconnect', methods=['POST'])
+@login_required
 def api_disconnect():
     """
     Endpoint: Disconnect from Server
@@ -161,6 +325,7 @@ def api_disconnect():
 
 
 @app.route('/api/status', methods=['GET'])
+@login_required
 def api_status():
     """
     Endpoint: Query Connection Status
@@ -184,6 +349,7 @@ def api_status():
 
 
 @app.route('/api/files', methods=['GET'])
+@login_required
 def api_files():
     """
     Endpoint: List Remote Files
@@ -201,6 +367,7 @@ def api_files():
 
 
 @app.route('/api/cwd', methods=['POST'])
+@login_required
 def api_cwd():
     """
     Endpoint: Navigate Remote Directories
@@ -232,6 +399,7 @@ def api_cwd():
 
 
 @app.route('/api/mkdir', methods=['POST'])
+@login_required
 def api_mkdir():
     """
     Endpoint: Create Remote Directory
@@ -263,6 +431,7 @@ def api_mkdir():
 
 
 @app.route('/api/rename', methods=['POST'])
+@login_required
 def api_rename():
     """
     Endpoint: Rename File or Directory
@@ -299,6 +468,7 @@ def api_rename():
 
 
 @app.route('/api/upload', methods=['POST'])
+@login_required
 def api_upload():
     """
     Endpoint: Upload File
@@ -327,6 +497,7 @@ def api_upload():
 
 
 @app.route('/api/download', methods=['GET'])
+@login_required
 def api_download():
     """
     Endpoint: Download File
@@ -369,6 +540,7 @@ def api_download():
 
 
 @app.route('/api/delete', methods=['POST'])
+@login_required
 def api_delete():
     """
     Endpoint: Delete File or Directory
@@ -401,8 +573,9 @@ if __name__ == '__main__':
     print("==================================================================")
     print("  NetTransfer – Multi-Protocol File Transfer System (FTP/FTPS/SFTP)")
     print("  Course Project: Implementation of Application Layer Protocols")
-    print(f"  Debug Mode : {is_debug}")
-    print(f"  Listening on: http://{host}:{port}")
+    print(f"  Database Path: {DB_PATH}")
+    print(f"  Storage Path : {STORAGE_PATH}")
+    print(f"  Listening on : http://{host}:{port}")
     print("==================================================================")
 
     app.run(host=host, port=port, debug=is_debug)

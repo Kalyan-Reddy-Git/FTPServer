@@ -33,6 +33,14 @@ ENV/
 # Temporary FTP test directories
 test_ftp_storage/
 tests/test_ftp_storage/
+demo_ftp_storage/users/
+demo_ftp_storage/*.pdf
+demo_ftp_storage/test.txt
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
 
 # IDE / Editor files
 .vscode/

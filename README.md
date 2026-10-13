@@ -30,6 +30,12 @@ The user interface maintains a clean **blue-and-white** college project aestheti
 
 ## 2. Key Features
 
+- **Client Registration & Automatic FTP Account Provisioning:**
+  - Client enters Full Name, Email, Username, Password, and Confirm Password.
+  - Secure `scrypt`/PBKDF2 password hashing — plaintext passwords are never stored or logged.
+  - Automatic backend provisioning: Creates isolated client storage (`users/<username>`) and links credentials directly with the FTP server.
+  - Zero manual admin account creation needed — `DatabaseAuthorizer` authenticates clients dynamically without server restarts.
+  - Multi-tenant directory chroot isolation: Each client is restricted strictly to their own directory.
 - **Dynamic Connection Settings:**
   - Selectable Protocol: **FTP**, **FTPS**, or **SFTP**.
   - Customizable Hostname / IP address, Port, Username, and Password.
@@ -48,6 +54,7 @@ The user interface maintains a clean **blue-and-white** college project aestheti
   - **Rename Files & Folders (`rename`):** In-place renaming via `RNFR`/`RNTO` (FTP) or `posix_rename` (SFTP).
   - **Delete Items:** Safely remove files and empty directories with confirmation dialogs.
 - **Security & Ethical Hacking Safeguards:**
+  - **Protected Private APIs:** All file operations require an active authenticated web session via `@login_required`.
   - **In-Memory Password Handling:** Credentials are never written to disk, never printed to console logs, and never returned in API payloads or client-side storage.
   - **SSRF (Server-Side Request Forgery) Defense:** Validates target hostnames to block attacks targeting cloud metadata endpoints (`169.254.169.254`, AWS, GCP, Azure metadata services).
   - **Path Traversal Protection:** Filenames are sanitized with strict character sets and traversal stripping (`../`, `..\`) before executing server filesystem commands.
